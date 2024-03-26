@@ -40,7 +40,6 @@ P = eye(Y_n); % This is just an identity matrix for illustration. %BUG 2: unknow
 
 % Preallocate for consumption choices and utility
 utility = zeros(a_n, Y_n, a_n);         %   Note that this is a three dimensional matrix, which is possible in Matlab.
-%BUG 3: utility
 %%%%% As I did not restrict the choice of consumption, many of these asset
 %%%%% and consumption choices will be incompatible with the budget
 %%%%% constraint. We want to make all those choice impossible to select.
