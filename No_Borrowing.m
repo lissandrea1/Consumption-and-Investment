@@ -131,5 +131,5 @@ figure;
 plot(lags,clgm);
 xlabel("lags")
 ylabel("Correlation Vector")
-title("Correlogram between Simulated Income and Consumption Series")
+title("Correlogram for No Borrowing")
 legend("Correlation at 4 lags")
