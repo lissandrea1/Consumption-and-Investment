@@ -30,7 +30,7 @@ count=1;
 tic    
 while count<maxits && dif>tol
     for ys=1:y_n
-c2(:, ys) = (beta * (1 + r) * interp1(w_orig, a, w1, 'linear', 'extrap').^(-gamma)* P(ys, :)').^(-1 / gamma); %%%BUG  
+c2(:, ys) = (beta * (1 + r) * interp1(w_orig, a, w1, 'linear', 'extrap').^(-gamma)* P(ys, :)').^(-1 / gamma); %%%BUG3: undefined variables  
     end
     c2(c2<0)=small_positive;
     w=A/(1+r)+c2;
@@ -93,12 +93,12 @@ xlabel('Time')
 ylabel('Income')
 
 subplot(3,1,2)
-plot(sims/2+1:sims,c_sim(sims/2+1:sims))
+plot(sims/2+1:sims,real(c_sim(sims/2+1:sims)))
 xlabel('Time')
 ylabel('Consumption')
 
 subplot(3,1,3)
-plot(sims/2+1:sims,w_sim(sims/2+1:sims))
+plot(sims/2+1:sims,real(w_sim(sims/2+1:sims)))
 xlabel('Time')
 ylabel('Cash-On-Hand')
 
@@ -106,8 +106,8 @@ ylabel('Cash-On-Hand')
 
 [clgm,lags] = xcorr(y_sim,c_sim,4);
 figure;
-plot(lags,clgm);
+plot(lags,real(clgm));
 xlabel("lags")
 ylabel("Correlation Vector")
-title("Correlogram for No Borrowing")
+title("Correlogram between Simulated Income and Consumption Series")
 legend("Correlation at 4 lags")
