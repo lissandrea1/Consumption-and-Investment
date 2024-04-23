@@ -1,0 +1,237 @@
+%%% Model Parameters
+beta=0.9;                   %%% Discount rate
+lambda=0.75;                %%% Opportunity cost of replacement
+delta=0.1;                  %%% Capital depreciation
+F=0.2;                      %%% Fixed costs
+AH=1.25;                    %%% High state
+AL=0.75;                    %%% Low state
+P=[0.9,0.1;0.1,0.9];        %%% Markov Process
+
+% Define the grid size 
+e_n = 20;   % number of grid points for idiosyncratic productivity
+k_n = 8;    % number of grid points for capital
+a_n =2;     % number of grid points for aggregate shock
+
+% Initialize the grids for k, A, e
+e = linspace(0.4, 1.6, e_n)';  % idiosyncratic productivity grid
+
+for i=0:k_n-1
+    K(i+1)=power((1-delta),i);
+end
+
+%%% Create a three dimensional array any point giving the revenue level
+
+R=e*AL*K;
+R(:,:,a_n)=e*AH*K;        %This is the product of Aek in the problem
+
+% Pre-allocate three-dimensional arrays for V_R, V_NR, and z
+V_R = zeros(size(R));   % value function if capital is replaced
+V_NR = zeros(size(R));  % value function if capital is not replaced
+z=zeros(size(R));
+V0=max(V_R,V_NR);
+
+%%% VFI Preallocations and Tolerances
+tol=10^(-9);            %   Maximum error tolerance       
+maxits=10^6;            %   Maximum number of iterations 
+
+%Main VFI loop
+dif=0.002;
+count=0;
+tic    
+while count<maxits && dif>tol
+z=zeros(size(R));
+    for i = 1:a_n
+% Compute the value of replacement and no replacement
+    V_R(:,:,i) = R(:,:,i)*lambda-F+beta*P(i,1)*repmat(V0(:,1,1),1,k_n)+beta*P(i,a_n)*repmat(V0(:,1,a_n),1,k_n);
+    for k=1:k_n-1
+        V_NR(:,k,i)=R(:,k+1,i)+beta*P(i,1)*V0(:,k+1,1)+beta*P(i,a_n)*V0(:,k+1,a_n);
+    end
+    end
+    % Compute the maximum absolute difference between the old and new value functions
+    V1=max(V_R,V_NR);
+    z(V1==V_R)=1;
+    dif = max(max(max(abs(V1-V0))));
+    count=count+1;
+    V0=V1;
+end
+toc 
+
+%% Plot the policy function using a spy plot.
+
+figure(1)
+% Plot the spy plot for the high state
+subplot(2,1,1);
+spy(z(:,:,1)')
+title('Low State');
+ylabel('Idiosyncratic Productivity');
+xlabel('Time Since Replacement');
+
+% Plot the spy plot for the low state 
+subplot(2,1,2);
+spy(z(:,:,2)')
+title('High State');
+ylabel('Idiosyncratic Productivity');
+xlabel('Time Since Replacement');
+
+% In here we see, when there is new capital, there is not much replacement
+% from the firm. Yet, when the capital gets older, the firm would stat
+% replacing the capital. Additionally, the firm will have higher
+% replacement when the idiosyncratic productivity is lower since the firm
+% will incur lower costs. Lastly, there is gonna be more replacement
+% happening in the higher state of productivity as we can see more
+% nonzeros in our plot.
+
+%%  Hazard function of capital replacement
+% This is a replicaton in Figure 1 in CHP(1999)
+% Based from proposition 2
+
+H=ones(k_n,a_n);
+for i=1:k_n
+    for j=1:a_n
+        H(i,j)=sum(z(:,i,j))/e_n;
+    end
+end
+
+x=(1:k_n);
+figure (2);
+plot(x,H(:,1),'LineWidth',2,'Color','k');
+hold on
+plot(x,H(:,a_n),"Color",'k');
+ylabel('Probability of Replacement');
+xlabel('Time Since Last Replacement');
+legend('Low state','High State');
+title('Theoretical Hazard For Machine Replacement');
+
+%%% Important features
+% The figure shows increasing hazard since the probability of replacement
+% increases for every period and that the revenues are higher. 
+% Therefore, firms are more likely to invest in times of higher productivity levels.  
+
+%% Simulate a time series using the policy function
+
+% Plot sample paths for something like 40 periods with the output of the firm and the capital stock of the firm
+
+t=50;
+T=160;
+time=(1:t);
+sim=randi(e_n,1,t);
+esim=e(sim);
+
+A1=zeros(1,T);
+A1(1)=1;
+
+for i=a_n:T
+    if A1(i-1)==1
+        A1(i)=randsample(1:a_n,1,true,P(1,:));
+    else
+        A1(i)=randsample(1:a_n,1,true,P(2,:));
+    end
+end
+
+Asim=A1;
+
+output=zeros(1,t+1);
+capital=zeros(1,t+1);
+capital(1)=1;
+sim1=zeros(1,t+1);
+sim1(1)=1;
+
+for i=1:t
+    output(i)=K(capital(i))*Asim(i)*esim(i)*(1-z(sim(i),capital(i),A1(i)))+z(sim(i),capital(i),A1(i))*(lambda*K(capital(i))*Asim(i)*esim(i)-F);
+    if z(sim(i),capital(i),A1(i))==1
+        capital(i+1)=1;
+        sim1(i+1)=K(capital(i+1));
+    else
+        capital(i+1)=capital(i)+1;
+        sim1(i+1)=K(capital(i+1));
+    end
+end
+
+figure (3);
+subplot(3,1,1)
+plot(time,output(1:t), 'Color','k');
+title('Investment Rate');
+ylabel('Rate');
+xlabel('period');
+subplot(3,1,2)
+plot(time,capital(1:t), 'Color','k');
+ylabel('Productivity of Capital');
+xlabel('period');
+
+%In here, we can see that there is a positive correlation between the
+%states and the investment rate. Furthermore, the investment rate
+%fluctuations happen due to the variations in the productivity of capital. 
+
+
+%% Assume A is fixed. Replicate Figure 3
+
+t=50;               %%% Number of periods given in the paper
+inv=zeros(t,1);     %%% Investment rate
+f=zeros(k_n,t+1);
+f(:,1)=ones(k_n,1);
+A=1;                %%% Assuming A is fixed
+
+for i=1:t
+    for j=1:k_n
+    inv(i)=inv(i)+H(j,A)*f(j,i);
+    end
+    f(1,i+1)=inv(i);
+    for j=a_n:k_n
+        f(j,i+1)=(1-H(j-1,A))*f(j-1,i);
+    end
+end
+
+inv_rate=inv/k_n;
+
+figure (4);
+y=(1:t);
+plot(y,inv_rate, 'Color', 'k');
+xlabel('Period');
+ylabel('Investment Rate');
+title('Convergence Without Aggregate Shocks - Baseline Simulation');
+
+%%% In this figure, we do not assume any aggregate uncertainties.
+%%% The obvious result show lumpy investments at the start of the period
+%%% since firms use previous old capital. This will then be followed with
+%%% lower investments until it converges to a stationary distribution.
+
+%% Let A follow the Markov process specified. Replicate Figure 4.
+
+T=160;                      %%%Number of periods
+inv1=zeros(T-1,1);
+g=zeros(k_n,T);
+g(:,1)=ones(k_n,1);   
+
+for i=1:T-1
+    for j=1:k_n
+    inv1(i)=inv1(i)+H(j,A1(i))*g(j,i);
+    end
+    g(1,i+1)=inv1(i);
+    for j=2:k_n
+        g(j,i+1)=(1-H(j-1,A1(i)))*g(j-1,i);
+    end
+end
+
+inv_rate1=inv1/k_n;
+
+figure (5);
+v=1:T-1;
+w=1:T;
+[y,hline1,hline2]=plotyy(v,inv_rate1,w,Asim);
+ylabel(y(1),'Investment Rate','Color','k')
+ylabel(y(2),'Aggregate State','Color','k')
+set(hline1, 'Color','k')
+set(hline2, 'Color', 'k')
+hline2.Marker='*';
+hline2.LineStyle='--';
+xlabel('period');
+title('Aggregate Investment Fluctuations-Baseline Simulation');
+
+%%% The most striking pattern is firms will most likely to invest during in
+%%% high states compared to low states.Another noticeable result is the
+%%% existence of investment cycles. As seen in the figure without
+%%% uncertaintites, the economy will then converge to a stationary
+%%% distribution and then switches again based on whether it is in the high
+%%% or low state. Lastly, these spikes in investment are not uniform in
+%%% responses as these values depend on the given distribution per period.
+
